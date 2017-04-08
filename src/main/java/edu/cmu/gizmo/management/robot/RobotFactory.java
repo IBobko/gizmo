@@ -64,10 +64,10 @@ public class RobotFactory {
 				proxy = new Cobot3TaskClient();
 				
 				System.out.print("[RobotFactory] Waiting for proxy to connect ... ");
-				Socket s = (new ServerSocket(ROBOT_PROXY_PORT,10)).accept();
-				System.out.println("Connected");	
+				//Socket s = (new ServerSocket(ROBOT_PROXY_PORT,10)).accept();
+				//System.out.println("Connected");
 				
-				proxy.installTaskProxy(s);
+				//proxy.installTaskProxy(s);
 				
 				return proxy;
 				
@@ -90,9 +90,9 @@ public class RobotFactory {
 				
 				System.out.print("[RobotFactory] Waiting for CoBot 3 to connect ... ");
 				Socket s = (new ServerSocket(ROBOT_CONTROL_PORT, 10)).accept();
-				System.out.println("Connected");	
+				System.out.println("Connected");
 				
-				robot.connect(s);			
+				robot.connect(s);
 				
 				return robot;
 			} catch (Exception e) { 
