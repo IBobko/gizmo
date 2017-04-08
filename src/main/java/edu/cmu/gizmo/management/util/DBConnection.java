@@ -23,19 +23,20 @@ public final class DBConnection {
 	 * @return the connection
 	 */
 	public static Connection getConnection(String dbName){
-		String url = "jdbc:mysql://128.2.204.91:3306/";
-		String driver = "com.mysql.jdbc.Driver";
-		String userName = "root"; 
-		String password = "gizmorulez";
-
-		try {
-			Class.forName(driver).newInstance();
-			conn = DriverManager.getConnection(url + dbName, userName, password);
-			System.out.println("[DBConnection] getConnection(): Connected to the database");
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return conn;
+//		String url = "jdbc:mysql://128.2.204.91:3306/";
+//		String driver = "com.mysql.jdbc.Driver";
+//		String userName = "root";
+//		String password = "gizmorulez";
+//
+//		try {
+//			Class.forName(driver).newInstance();
+//			conn = DriverManager.getConnection(url + dbName, userName, password);
+//			System.out.println("[DBConnection] getConnection(): Connected to the database");
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//		return conn;
+		return null;
 	}
 
 	/**

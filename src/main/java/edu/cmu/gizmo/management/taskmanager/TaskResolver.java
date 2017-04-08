@@ -75,7 +75,7 @@ public class TaskResolver {
 	public String retrieveCapablityName(String primitive) 
 			throws CapabilityNotFoundForPrimitive {
 		// 1. Retrieve capability name from database using primitive
-		String capabilityName = dbo.retrieveCapability(primitive);
+		String capabilityName = /*dbo.retrieveCapability(primitive);*/"DummyCapability";
 		if(capabilityName == null)
 			throw new CapabilityNotFoundForPrimitive();
 			
