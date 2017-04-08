@@ -176,6 +176,7 @@ implements MessageListener, GizmoTaskClient {
 	public void onMessage(final Message message) {
 		// unwrap and handle the message and handle it
 		try {
+			System.out.println("[TaskClient] " + message.getStringProperty("gizmo"));
 
 			final ObjectMessage objMessage = (ObjectMessage) message;
 			messageHandler.handleMessage((TaskMessage) objMessage.getObject());
@@ -286,7 +287,7 @@ implements MessageListener, GizmoTaskClient {
 			/*
 			 *  Check if this is the right task (i.e. it is not from the client)
 			 */
-			
+
 			final TaskReservation rejectedRequest = message.getReservation();
 			final String reason = message.getReason();
 			

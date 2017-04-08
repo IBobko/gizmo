@@ -355,8 +355,9 @@ public class TaskManager implements Observer, MessageListener {
 	 */
 	@Override
 	public synchronized void onMessage(final Message busMessage) {
-		
+
 		try {
+			System.out.println(busMessage.getStringProperty("gizmo"));
 			final ObjectMessage om = (ObjectMessage) busMessage;
 			final TaskMessage message = (TaskMessage) om.getObject();
 
