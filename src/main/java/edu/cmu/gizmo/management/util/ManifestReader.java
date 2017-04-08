@@ -61,25 +61,23 @@ public class ManifestReader {
     		BufferedReader br = new BufferedReader(is);
     		String read = br.readLine();
 
-    		while(read != null) {
-    		    //System.out.println(read);
-    		    sb.append(read);
-    		    read =br.readLine();
-    		}
-    		System.out.println("Property: " + sb.toString());
+    		while(null != read) {
+				System.out.println("Property: " + sb.toString());
 
-    		String[] str_array = sb.toString().split("=");
-    		key = str_array[0]; 
-    		value = str_array[1];
-    		value.replace(".", "/");
-    		System.out.println("value: " + value);
-    		configuration.put(key, value);
+				String[] str_array = read.split("=");
+				if (str_array.length > 1) {
+					key = str_array[0];
+					value = str_array[1];
+					value.replace(".", "/");
+					System.out.println("value: " + value);
+					configuration.put(key, value);
 
-    		
-    		
-    		System.out.println(configuration.get(CAPABILITY_DIRECTORY) + "/" + 
-					"GoToRoomDriveCapability" + ".mf");
 
+					System.out.println(configuration.get(CAPABILITY_DIRECTORY) + "/" +
+							"GoToRoomDriveCapability" + ".mf");
+				}
+				read = br.readLine();
+			}
     		
     	} catch (IOException ex) {
     		ex.printStackTrace();
@@ -130,7 +128,7 @@ public class ManifestReader {
         		}
     		    
     		    
-    		    read =br.readLine();
+    		    read = br.readLine();
     		}
 			System.out.println("---End ManifestReader---");
 
