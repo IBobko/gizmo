@@ -7,6 +7,7 @@
 
 
 mtype = {
+
     Message_TASK_READY,
     Message_HELO_CLIENT,
     Message_CAPABILITY_COMPLETE,
@@ -21,7 +22,7 @@ mtype = {
     Message_REJECT_TASK
 }
 
-chan qname = [16] of { short };
+chan qname = [16] of { mtype, short };
 
 init {
     printf("Program is started... PID = %d\n",_pid)
@@ -33,17 +34,23 @@ init {
 proctype taskManager() {
     printf("Starting TaskManager. PID = %d \n",_pid);
 
-    qname ! 16;
+    mtype v;
+    short m;
+
+    qname ? v,m;
+
+    printf("%d\n",m);
 }
 
 
 proctype taskClient() {
     printf("Starting TaskClient. PID = %d \n",_pid);
 
-    short msg;
 
-    qname ? msg;
+    short msg = 16;
 
-    printf("start b\n %d\n", msg)
+    qname ! Message_TASK_READY , msg;
+
+
 
 }
