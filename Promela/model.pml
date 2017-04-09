@@ -5,22 +5,18 @@
  *
 **/
 
-#define LENGTH  10 /* length of message queue */
+typedef MESSAGE {
+    mtype msg;
+    mtype type;
+    byte task_id,
+    capability_id
+}
 
-mtype = {
-    TASK_CLIENT,
-    TASK_MANAGER,
-    CAPABILITY
-};
+mtype = {SEQUENCE,PARALLEL};
 
+int last_task_id = 1;
+int last_capability_id = 1;
 
-/*In this case we declare type for out message*/
-typedef MessageType {
-    mtype msg; /* This can be TASK_CLIENT, TASK_MANAGER or CAPABILITY */
-    byte task_id, capability_id, capability_name, task_settings, input_parameters;
-  }
-
-mtype = {READY, RUNNING, COMPLETE, ERROR, PAUSED, CANCELED};
 
 mtype = {
     Message_REJECT_TASK,
@@ -30,8 +26,8 @@ mtype = {
     Message_CAPABILITY_INPUT,
     Message_CAPABILITY_OUTPUT,
     Message_CLIENT_REPLAN,
-    Message_HELLO_CLIENT,
-    Message_PAUSE_COMPLETE,
+    Message_HELO_CLIENT,
+    Message_PAUSE_TASK_COMPLETE,
     Message_PAUSE_LIST,
     Message_PAUSE_TASK,
     Message_RESUME_TASK_COMPLETE,
@@ -40,49 +36,114 @@ mtype = {
     Message_SYSTEM_REPLAN,
     Message_TASK_COMPLETE,
     Message_TASK_READY,
-    Message_CAPABILITY_STATUS
+    Message_CAPABILITY_STATUS,
+    Message_TERMINATE_CAPABILITY
 };
 
+#define LENGTH  20  /* length of message queue chanel */
 
-chan MessageBroker = [LENGTH] of {mtype, MessageType};
+mtype = {TASK_CLIENT, TASK_MANAGER, CAPABILITY};
+
+chan MessageBroker = [LENGTH] of {mtype, MESSAGE};
 
 init {
-    printf ("Application is started\n");
-    run TaskClient();
-    run TaskManager();
-    run Capability();
+  printf ("Application is started\n");
+  run TaskManager();
+  run Capability();
+  run TaskClient();
 
-    // Trying to start load task
-    MessageType M;
-    M.msg = Message_LOAD_TASK;
-    M.task_id = 1
-    run SendMessage(TASK_MANAGER, M);
+  run SendInitMessage(SEQUENCE);
+  //run SendInitMessage(PARALLEL);
 }
+
+proctype SendInitMessage(mtype type) {
+    atomic {
+        MESSAGE message;
+        message.msg = Message_LOAD_TASK;
+        message.type = type;
+        run SendMessage(TASK_MANAGER, message);
+    }
+}
+
 
 proctype TaskClient()
 {
-
-  MessageType message;
-
+  MESSAGE message;
   do
-  :: MessageBroker ? TASK_CLIENT, message ->
-  {
-    printf("Task Client received [%d] -", message.msg);
+  :: MessageBroker ? TASK_CLIENT, message -> {
+
+    printf("TASK_CLIENT received \"%e\" with task_id = %d, capability_id = %d \n", message.msg, message.task_id, message.capability_id);
     if
-    :: message.msg == Message_TASK_READY -> printf("Task Ready Message\n");
-    :: message.msg == Message_HELLO_CLIENT -> {
-        printf("Helo Client Message\n");
+    :: message.msg == Message_TASK_READY -> {
+            int f = 0; // NEED CHANGE
+        };
+    :: message.msg == Message_HELO_CLIENT -> {
+        if
+        :: message.type == PARALLEL -> {
 
-        //Send Message_START_CAPABILITY to Capability
-        MessageType M1; M1.msg = Message_START_CAPABILITY; M1.task_id = message.task_id
-        run SendMessage(CAPABILITY, M1);
+              last_capability_id++;
+              //Send Message_START_CAPABILITY to Capability
 
-        //Send Message_CAPABILITY_INPUT to Capability
-        MessageType M2; M2.msg = Message_CAPABILITY_INPUT; M2.task_id = message.task_id
-        run SendMessage(CAPABILITY, M2);
+              MESSAGE capability_message1;
+              capability_message1.msg = Message_START_CAPABILITY;
+              capability_message1.task_id = message.task_id
+
+              capability_message1.capability_id = last_capability_id;
+              run SendMessage(CAPABILITY, capability_message1);
+
+              //Send CapabilityInputMessage to Capability
+              MESSAGE capability_message2;
+              capability_message2.msg = Message_CAPABILITY_INPUT;
+              capability_message2.task_id = message.task_id
+              capability_message2.capability_id=last_capability_id;
+              run SendMessage(CAPABILITY, capability_message2);
+
+              last_capability_id++;
+
+              capability_message1.capability_id = last_capability_id;
+              run SendMessage(CAPABILITY, capability_message1);
+
+              capability_message2.capability_id=last_capability_id;
+              run SendMessage(CAPABILITY, capability_message2);
+
+            }
+        :: message.type == SEQUENCE -> {
+              last_capability_id++;
+              //Send Message_START_CAPABILITY to Capability
+
+              MESSAGE capability_message1;
+              capability_message1.msg = Message_START_CAPABILITY;
+              capability_message1.task_id = message.task_id
+
+              capability_message1.capability_id = last_capability_id;
+              run SendMessage(CAPABILITY, capability_message1);
+
+
+              //Send CapabilityInputMessage to Capability
+              MESSAGE capability_message2;
+              capability_message2.msg = Message_CAPABILITY_INPUT;
+              capability_message2.task_id = message.task_id
+              capability_message2.capability_id=last_capability_id;
+              run SendMessage(CAPABILITY, capability_message2);
+
+              MESSAGE message_from_capability;
+
+              MessageBroker ? TASK_CLIENT,message_from_capability-> {
+                printf("%e WORK1",message_from_capability.msg);
+                MessageBroker ? TASK_CLIENT,message_from_capability -> {
+                    printf("%e WORK2",message_from_capability.msg);
+                }
+              }
+
+        }
+        fi
       }
-    :: message.msg == Message_CAPABILITY_OUTPUT -> printf("Capability Output Message\n");
-    :: message.msg == Message_CAPABILITY_COMPLETE -> printf("Capability Complete Message\n");
+    :: message.msg == Message_CAPABILITY_OUTPUT -> {
+
+    }
+    :: message.msg == Message_CAPABILITY_COMPLETE -> {
+
+    }
     fi
   }
   od
@@ -90,69 +151,67 @@ proctype TaskClient()
 
 proctype TaskManager()
 {
-  MessageType message;
-  do
-  :: MessageBroker ? TASK_MANAGER, message ->
-    {
-      printf("Task Manager received [%d] -", message.msg);
-      if
-      :: message.msg == Message_LOAD_TASK -> printf("Load Task Message\n");
-      fi
+    MESSAGE message;
+    do
+    :: MessageBroker ? TASK_MANAGER, message -> {
+        printf("Task Manager received %e \n\n", message.msg);
 
-      // Send Ready to Task Client
-      MessageType M1;
+        // Send Ready to Task Client
+        MESSAGE task_ready_message;
+        task_ready_message.msg = Message_TASK_READY;
+        task_ready_message.task_id = last_task_id;
+        task_ready_message.type = message.type;
+        run SendMessage(TASK_CLIENT, task_ready_message);
 
-      M1.msg = Message_TASK_READY;
-      M1.task_id = message.task_id;
+        // Send Helo Client to Task Client
+        MESSAGE helo_client_message;
+        helo_client_message.msg = Message_HELO_CLIENT;
+        helo_client_message.task_id = last_task_id;
+        helo_client_message.type = message.type;
+        run SendMessage(TASK_CLIENT, helo_client_message);
 
-      run SendMessage(TASK_CLIENT, M1);
-
-       // Send Helo Client to Task Client
-      MessageType M2; M2.msg = Message_HELLO_CLIENT; M2.task_id = message.task_id
-      run SendMessage(TASK_CLIENT, M2);
+        last_task_id = last_task_id + 1;
     }
   od
 }
 
 proctype Capability()
 {
-  MessageType M;
+  MESSAGE message;
   do
-  :: MessageBroker ? CAPABILITY, M -> {
-      printf("Capability received [%d] -", M.msg);
+  :: MessageBroker ? CAPABILITY, message -> {
+      printf("Capability received \"%e\" with task_id = %d, capability_id = %d \n", message.msg, message.task_id, message.capability_id);
       if
-      :: M.msg == Message_START_CAPABILITY -> printf("Start Capability Message\n");
-      :: M.msg == Message_CAPABILITY_INPUT -> {
-        printf("Capability Input Message\n");
+      :: message.msg == Message_START_CAPABILITY -> {
+        {
+            int f=0
+        }; //printf("Task Ready Message [tid=%d]\n", M.task_id);printf("Start Capability Message[capid=%d]\n", M.capability_id);
+      }
+      :: message.msg == Message_CAPABILITY_INPUT -> {
 
-        // Send Message_CAPABILITY_OUTPUT to Task Client
-        MessageType M1; M1.msg = Message_CAPABILITY_OUTPUT; M1.task_id = M.task_id
-        run SendMessage(TASK_CLIENT, M1);
+        // Send CapabilityOutputMessage to Task Client
+        MESSAGE capability_output_message;
+        capability_output_message.msg = Message_CAPABILITY_OUTPUT;
+        capability_output_message.task_id = message.task_id
+        capability_output_message.capability_id = message.capability_id
+        run SendMessage(TASK_CLIENT, capability_output_message);
 
-        // Send Message_CAPABILITY_COMPLETE to Task Client
-        MessageType M2; M2.msg = Message_CAPABILITY_COMPLETE; M2.task_id = M.task_id
-        run SendMessage(TASK_CLIENT, M2);
+        // Send CapabilityCompleteMessage to Task Client
+        MESSAGE capability_complete_message;
+        capability_complete_message.msg = Message_CAPABILITY_COMPLETE;
+        capability_complete_message.task_id = message.task_id
+        capability_complete_message.capability_id = message.capability_id
+        run SendMessage(TASK_CLIENT, capability_complete_message);
       }
       fi
     }
   od
 }
 
-/* This function sends message the concrete recipient.*/
-proctype SendMessage(mtype recipient; MessageType message) {
 
-  printf("Sending message");
-  if
-  ::(message.msg == Message_LOAD_TASK)->printf("LOAD_TASK");
-  fi
-
-  printf("to");
-
-  if
-  ::(recipient == TASK_MANAGER)->printf("TASK_MANAGER");
-  fi
-
-
-  printf("Sending message [%d] to [%d]\n", message.msg, recipient)
-  MessageBroker ! recipient, message
+proctype SendMessage(mtype recipient; MESSAGE message) {
+  atomic {
+    printf("Sending message \"%e\" taskid = %d, capability_id=%d to \"%e\"\n\n", message.msg, message.task_id, message.capability_id, recipient)
+    MessageBroker ! recipient, message
+  }
 }
