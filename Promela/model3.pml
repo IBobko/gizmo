@@ -61,26 +61,27 @@ init {
 proctype TaskClient()
 {
 
-  MessageType M;
+  MessageType message;
 
   do
-  :: MessageBroker ? TASK_CLIENT, M ->{
-    printf("Task Client received [%d] -", M.msg);
+  :: MessageBroker ? TASK_CLIENT, message ->
+  {
+    printf("Task Client received [%d] -", message.msg);
     if
-    :: M.msg == Message_TASK_READY -> printf("Task Ready Message\n");
-    :: M.msg == Message_HELLO_CLIENT -> {
+    :: message.msg == Message_TASK_READY -> printf("Task Ready Message\n");
+    :: message.msg == Message_HELLO_CLIENT -> {
         printf("Helo Client Message\n");
 
         //Send Message_START_CAPABILITY to Capability
-        MessageType M1; M1.msg = Message_START_CAPABILITY; M1.task_id = M.task_id
+        MessageType M1; M1.msg = Message_START_CAPABILITY; M1.task_id = message.task_id
         run SendMessage(CAPABILITY, M1);
 
         //Send Message_CAPABILITY_INPUT to Capability
-        MessageType M2; M2.msg = Message_CAPABILITY_INPUT; M2.task_id = M.task_id
+        MessageType M2; M2.msg = Message_CAPABILITY_INPUT; M2.task_id = message.task_id
         run SendMessage(CAPABILITY, M2);
       }
-    :: M.msg == Message_CAPABILITY_OUTPUT -> printf("Capability Output Message\n");
-    :: M.msg == Message_CAPABILITY_COMPLETE -> printf("Capability Complete Message\n");
+    :: message.msg == Message_CAPABILITY_OUTPUT -> printf("Capability Output Message\n");
+    :: message.msg == Message_CAPABILITY_COMPLETE -> printf("Capability Complete Message\n");
     fi
   }
   od
