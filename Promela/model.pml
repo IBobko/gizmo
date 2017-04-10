@@ -209,7 +209,7 @@ proctype TaskManager()
 
         //Transferring of managing to TaskExecutor
         run TaskExecutor(message);
-        last_task_id = last_task_id + 1;
+        last_task_id++;
     }
     od
 }
@@ -223,9 +223,7 @@ proctype Capability()
       if
       :: message.msg == Message_START_CAPABILITY -> {
         {
-            int a = 10;
-
-
+            run SetStatusCapability(message, CAPABILITY_RUNNING_STATUS);
         };
       }
       :: message.msg == Message_CAPABILITY_INPUT -> {
@@ -237,8 +235,10 @@ proctype Capability()
         capability_output_message.capability_id = message.capability_id
         run SendMessage(TASK_CLIENT, capability_output_message);
 
-
         run SetStatusCapability(message,CAPABILITY_COMPLETE_STATUS);
+      }
+      :: message.msg == Message_TERMINATE_CAPABILITY -> {
+            printf("Terminate capability");
       }
       fi
     }
