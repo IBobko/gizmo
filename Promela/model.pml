@@ -15,7 +15,7 @@ typedef MESSAGE {
 mtype = {SEQUENCE, PARALLEL};
 
 int last_task_id = 1;
-int last_capability_id = 1;
+
 
 
 mtype = {
@@ -59,7 +59,6 @@ chan MessageBroker = [LENGTH] of {mtype, MESSAGE};
 init {
   printf ("Application is started.\n");
   run TaskManager();
-  run Capability();
   run TaskClient();
 
   //run SendInitMessage(SEQUENCE);
@@ -84,6 +83,52 @@ proctype ScriptTaskStrategy(MESSAGE message) {
     run SetStatusCapability(message,CAPABILITY_LOADED_STATUS);
 }
 
+
+proctype Capability2(int capability_id) {
+  MESSAGE message;
+
+  start_capability: skip;
+  do
+  :: MessageBroker ? CAPABILITY, message -> {
+      if
+        ::message.capability_id != capability_id -> {
+
+            printf("%d - %d\n",message.capability_id,capability_id);
+
+            printf("False message");
+            MessageBroker ! CAPABILITY, message;
+            break;
+            goto start_capability;
+
+        }
+      fi
+
+      printf("Capability received \"%e\" with task_id = %d, capability_id = %d \n", message.msg, message.task_id, message.capability_id);
+      if
+      :: message.msg == Message_START_CAPABILITY -> {
+        {
+            run SetStatusCapability(message, CAPABILITY_RUNNING_STATUS);
+        };
+      }
+      :: message.msg == Message_CAPABILITY_INPUT -> {
+
+        // Send CapabilityOutputMessage to Task Client
+        MESSAGE capability_output_message;
+        capability_output_message.msg = Message_CAPABILITY_OUTPUT;
+        capability_output_message.task_id = message.task_id
+        capability_output_message.capability_id = message.capability_id
+        run SendMessage(TASK_CLIENT, capability_output_message);
+
+        run SetStatusCapability(message,CAPABILITY_COMPLETE_STATUS);
+      }
+      :: message.msg == Message_TERMINATE_CAPABILITY -> {
+            printf("Terminate capability");
+      }
+      fi
+    }
+  od
+}
+
 proctype SetStatusCapability(MESSAGE message; mtype status) {
     atomic {
         printf("Set status of capability: %e",status)
@@ -94,14 +139,15 @@ proctype SetStatusCapability(MESSAGE message; mtype status) {
             helo_client_message.msg = Message_HELO_CLIENT;
             helo_client_message.task_id = message.task_id;
             helo_client_message.type = message.type;
+            helo_client_message.capability_id = message.capability_id;
             run SendMessage(TASK_CLIENT, helo_client_message);
         }
         :: status == CAPABILITY_COMPLETE_STATUS -> {
             // Send CapabilityCompleteMessage to Task Client
             MESSAGE capability_complete_message;
             capability_complete_message.msg = Message_CAPABILITY_COMPLETE;
-            capability_complete_message.task_id = message.task_id
-            capability_complete_message.capability_id = message.capability_id
+            capability_complete_message.task_id = message.task_id;
+            capability_complete_message.capability_id = message.capability_id;
             run SendMessage(TASK_CLIENT, capability_complete_message);
         }
         fi
@@ -125,41 +171,39 @@ proctype TaskClient()
         if
         :: message.type == PARALLEL -> {
 
-              last_capability_id++;
               //Send Message_START_CAPABILITY to Capability
 
               MESSAGE capability_message1;
               capability_message1.msg = Message_START_CAPABILITY;
               capability_message1.task_id = message.task_id;
 
-              capability_message1.capability_id = last_capability_id;
-              run SendMessage(CAPABILITY, capability_message1);
+              capability_message1.capability_id = message.capability_id;
+                run SendMessage(CAPABILITY, capability_message1);
 
               //Send CapabilityInputMessage to Capability
               MESSAGE capability_message2;
               capability_message2.msg = Message_CAPABILITY_INPUT;
               capability_message2.task_id = message.task_id
-              capability_message2.capability_id=last_capability_id;
+              capability_message2.capability_id = message.capability_id;
               run SendMessage(CAPABILITY, capability_message2);
 
-              last_capability_id++;
 
-              capability_message1.capability_id = last_capability_id;
+              capability_message1.capability_id = message.capability_id;
               run SendMessage(CAPABILITY, capability_message1);
 
-              capability_message2.capability_id=last_capability_id;
+              capability_message2.capability_id = message.capability_id
               run SendMessage(CAPABILITY, capability_message2);
 
             }
         :: message.type == SEQUENCE -> {
-              last_capability_id++;
+
               //Send Message_START_CAPABILITY to Capability
 
               MESSAGE capability_message1;
               capability_message1.msg = Message_START_CAPABILITY;
               capability_message1.task_id = message.task_id
 
-              capability_message1.capability_id = last_capability_id;
+              capability_message1.capability_id =  message.capability_id;
               run SendMessage(CAPABILITY, capability_message1);
 
 
@@ -167,7 +211,7 @@ proctype TaskClient()
               MESSAGE capability_message2;
               capability_message2.msg = Message_CAPABILITY_INPUT;
               capability_message2.task_id = message.task_id
-              capability_message2.capability_id=last_capability_id;
+              capability_message2.capability_id = message.capability_id;
               run SendMessage(CAPABILITY, capability_message2);
 
               MESSAGE message_from_capability;
@@ -202,12 +246,17 @@ proctype TaskManager()
         atomic {
             printf("Task Manager received %e \n\n", message.msg);
 
+            run Capability2(last_task_id);
+
             // Send Ready to Task Client
             MESSAGE task_ready_message;
             task_ready_message.msg = Message_TASK_READY;
             task_ready_message.task_id = last_task_id;
             task_ready_message.type = message.type;
+            task_ready_message.capability_id = last_task_id;
             run SendMessage(TASK_CLIENT, task_ready_message);
+
+            message.capability_id = last_task_id;
 
             //Transferring of managing to TaskExecutor
             run TaskExecutor(message);
@@ -216,38 +265,6 @@ proctype TaskManager()
     }
     od
 }
-
-proctype Capability()
-{
-  MESSAGE message;
-  do
-  :: MessageBroker ? CAPABILITY, message -> {
-      printf("Capability received \"%e\" with task_id = %d, capability_id = %d \n", message.msg, message.task_id, message.capability_id);
-      if
-      :: message.msg == Message_START_CAPABILITY -> {
-        {
-            run SetStatusCapability(message, CAPABILITY_RUNNING_STATUS);
-        };
-      }
-      :: message.msg == Message_CAPABILITY_INPUT -> {
-
-        // Send CapabilityOutputMessage to Task Client
-        MESSAGE capability_output_message;
-        capability_output_message.msg = Message_CAPABILITY_OUTPUT;
-        capability_output_message.task_id = message.task_id
-        capability_output_message.capability_id = message.capability_id
-        run SendMessage(TASK_CLIENT, capability_output_message);
-
-        run SetStatusCapability(message,CAPABILITY_COMPLETE_STATUS);
-      }
-      :: message.msg == Message_TERMINATE_CAPABILITY -> {
-            printf("Terminate capability");
-      }
-      fi
-    }
-  od
-}
-
 
 proctype SendMessage(mtype recipient; MESSAGE message) {
   atomic {
