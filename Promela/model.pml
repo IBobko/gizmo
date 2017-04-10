@@ -63,6 +63,12 @@ init {
 
   //run SendInitMessage(SEQUENCE);
   run SendInitMessage(PARALLEL);
+
+//  run SendInitMessage(PARALLEL);
+
+//  run SendInitMessage(PARALLEL);
+
+//  run SendInitMessage(PARALLEL);
 }
 
 proctype SendInitMessage(mtype type) {
@@ -84,24 +90,19 @@ proctype ScriptTaskStrategy(MESSAGE message) {
 }
 
 
-proctype Capability2(int capability_id) {
+proctype Capability(int capability_id) {
   MESSAGE message;
 
   start_capability: skip;
   do
   :: MessageBroker ? CAPABILITY, message -> {
-      if
-        ::message.capability_id != capability_id -> {
-
-            printf("%d - %d\n",message.capability_id,capability_id);
-
-            printf("False message");
-            MessageBroker ! CAPABILITY, message;
-            break;
-            goto start_capability;
-
-        }
-      fi
+//      if
+//        ::message.capability_id != capability_id -> {
+//            MessageBroker ! CAPABILITY, message;
+//            break;
+//            goto start_capability;
+//        }
+//      fi
 
       printf("Capability received \"%e\" with task_id = %d, capability_id = %d \n", message.msg, message.task_id, message.capability_id);
       if
@@ -110,6 +111,7 @@ proctype Capability2(int capability_id) {
             run SetStatusCapability(message, CAPABILITY_RUNNING_STATUS);
         };
       }
+
       :: message.msg == Message_CAPABILITY_INPUT -> {
 
         // Send CapabilityOutputMessage to Task Client
@@ -131,7 +133,7 @@ proctype Capability2(int capability_id) {
 
 proctype SetStatusCapability(MESSAGE message; mtype status) {
     atomic {
-        printf("Set status of capability: %e",status)
+        printf("Set status of capability: %e\n\n",status)
         if
         :: status == CAPABILITY_LOADED_STATUS -> {
             // Send Helo Client to Task Client
@@ -141,6 +143,9 @@ proctype SetStatusCapability(MESSAGE message; mtype status) {
             helo_client_message.type = message.type;
             helo_client_message.capability_id = message.capability_id;
             run SendMessage(TASK_CLIENT, helo_client_message);
+        }
+        :: status == CAPABILITY_RUNNING_STATUS -> {
+            int f = 0;
         }
         :: status == CAPABILITY_COMPLETE_STATUS -> {
             // Send CapabilityCompleteMessage to Task Client
@@ -163,7 +168,11 @@ proctype TaskClient()
   :: MessageBroker ? TASK_CLIENT, message -> {
 
     printf("TASK_CLIENT received \"%e\" with task_id = %d, capability_id = %d \n", message.msg, message.task_id, message.capability_id);
+
     if
+    :: message.msg == Message_REJECT_TASK -> {
+        printf("Task is rejected.");
+    };
     :: message.msg == Message_TASK_READY -> {
             int f = 0; // NEED CHANGE
         };
@@ -188,11 +197,11 @@ proctype TaskClient()
               run SendMessage(CAPABILITY, capability_message2);
 
 
-              capability_message1.capability_id = message.capability_id;
-              run SendMessage(CAPABILITY, capability_message1);
+              //capability_message1.capability_id = message.capability_id;
+              //run SendMessage(CAPABILITY, capability_message1);
 
-              capability_message2.capability_id = message.capability_id
-              run SendMessage(CAPABILITY, capability_message2);
+              //capability_message2.capability_id = message.capability_id
+              //run SendMessage(CAPABILITY, capability_message2);
 
             }
         :: message.type == SEQUENCE -> {
@@ -243,25 +252,38 @@ proctype TaskManager()
     MESSAGE message;
     do
     :: MessageBroker ? TASK_MANAGER, message -> {
-        atomic {
+
             printf("Task Manager received %e \n\n", message.msg);
 
-            run Capability2(last_task_id);
+            do
+            :: {
+                run Capability(last_task_id);
+                // Send Ready to Task Client
+                MESSAGE task_ready_message;
+                task_ready_message.msg = Message_TASK_READY;
+                task_ready_message.task_id = last_task_id;
+                task_ready_message.type = message.type;
+                task_ready_message.capability_id = last_task_id;
+                run SendMessage(TASK_CLIENT, task_ready_message);
 
-            // Send Ready to Task Client
-            MESSAGE task_ready_message;
-            task_ready_message.msg = Message_TASK_READY;
-            task_ready_message.task_id = last_task_id;
-            task_ready_message.type = message.type;
-            task_ready_message.capability_id = last_task_id;
-            run SendMessage(TASK_CLIENT, task_ready_message);
+                message.capability_id = last_task_id;
 
-            message.capability_id = last_task_id;
+                //Transferring of managing to TaskExecutor
+                run TaskExecutor(message);
+                last_task_id++;
+                break;
+            }
+            :: {
+                MESSAGE task_reject_message;
+                task_reject_message.msg = Message_REJECT_TASK;
+                task_reject_message.task_id = last_task_id;
+                task_reject_message.capability_id = last_task_id;
+                run SendMessage(TASK_CLIENT, task_reject_message);
 
-            //Transferring of managing to TaskExecutor
-            run TaskExecutor(message);
-            last_task_id++;
-        }
+                last_task_id++;
+                break;
+            }
+            od
     }
     od
 }
