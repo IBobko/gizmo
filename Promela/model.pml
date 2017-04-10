@@ -85,26 +85,27 @@ proctype ScriptTaskStrategy(MESSAGE message) {
 }
 
 proctype SetStatusCapability(MESSAGE message; mtype status) {
-    printf("Set status of capability: %e",status)
-    if
-    :: status == CAPABILITY_LOADED_STATUS -> {
-        // Send Helo Client to Task Client
-        MESSAGE helo_client_message;
-        helo_client_message.msg = Message_HELO_CLIENT;
-        helo_client_message.task_id = message.task_id;
-        helo_client_message.type = message.type;
-        run SendMessage(TASK_CLIENT, helo_client_message);
+    atomic {
+        printf("Set status of capability: %e",status)
+        if
+        :: status == CAPABILITY_LOADED_STATUS -> {
+            // Send Helo Client to Task Client
+            MESSAGE helo_client_message;
+            helo_client_message.msg = Message_HELO_CLIENT;
+            helo_client_message.task_id = message.task_id;
+            helo_client_message.type = message.type;
+            run SendMessage(TASK_CLIENT, helo_client_message);
+        }
+        :: status == CAPABILITY_COMPLETE_STATUS -> {
+            // Send CapabilityCompleteMessage to Task Client
+            MESSAGE capability_complete_message;
+            capability_complete_message.msg = Message_CAPABILITY_COMPLETE;
+            capability_complete_message.task_id = message.task_id
+            capability_complete_message.capability_id = message.capability_id
+            run SendMessage(TASK_CLIENT, capability_complete_message);
+        }
+        fi
     }
-    :: status == CAPABILITY_COMPLETE_STATUS -> {
-        // Send CapabilityCompleteMessage to Task Client
-        MESSAGE capability_complete_message;
-        capability_complete_message.msg = Message_CAPABILITY_COMPLETE;
-        capability_complete_message.task_id = message.task_id
-        capability_complete_message.capability_id = message.capability_id
-        run SendMessage(TASK_CLIENT, capability_complete_message);
-    }
-    fi
-
 }
 
 
@@ -198,18 +199,20 @@ proctype TaskManager()
     MESSAGE message;
     do
     :: MessageBroker ? TASK_MANAGER, message -> {
-        printf("Task Manager received %e \n\n", message.msg);
+        atomic {
+            printf("Task Manager received %e \n\n", message.msg);
 
-        // Send Ready to Task Client
-        MESSAGE task_ready_message;
-        task_ready_message.msg = Message_TASK_READY;
-        task_ready_message.task_id = last_task_id;
-        task_ready_message.type = message.type;
-        run SendMessage(TASK_CLIENT, task_ready_message);
+            // Send Ready to Task Client
+            MESSAGE task_ready_message;
+            task_ready_message.msg = Message_TASK_READY;
+            task_ready_message.task_id = last_task_id;
+            task_ready_message.type = message.type;
+            run SendMessage(TASK_CLIENT, task_ready_message);
 
-        //Transferring of managing to TaskExecutor
-        run TaskExecutor(message);
-        last_task_id++;
+            //Transferring of managing to TaskExecutor
+            run TaskExecutor(message);
+            last_task_id++;
+        }
     }
     od
 }
