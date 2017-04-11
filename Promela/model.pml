@@ -126,9 +126,13 @@ proctype Capability(int capability_id) {
       :: message.msg == Message_TERMINATE_CAPABILITY -> {
             printf("Terminate capability");
       }
+      :: message.msg == Message_CANCEL_TASK -> {
+        goto exit2;
+      }
       fi
     }
   od
+  exit2:skip;
 }
 
 proctype SetStatusCapability(MESSAGE message; mtype status) {
@@ -172,9 +176,18 @@ proctype TaskClient()
     if
     :: message.msg == Message_REJECT_TASK -> {
         printf("Task is rejected.");
+        goto exit;
     };
     :: message.msg == Message_TASK_READY -> {
-            int f = 0; // NEED CHANGE
+            do
+              :: int i = 0; break;
+              :: {
+                message.msg = Message_CANCEL_TASK;
+                run SendMessage(CAPABILITY, message);
+                goto exit;
+              }
+             od
+
         };
     :: message.msg == Message_HELO_CLIENT -> {
         if
@@ -240,10 +253,13 @@ proctype TaskClient()
     }
     :: message.msg == Message_CAPABILITY_COMPLETE -> {
         int a = 10;
+        goto exit;
     }
     fi
   }
   od
+
+  exit:skip;
 }
 
 proctype TaskManager()
